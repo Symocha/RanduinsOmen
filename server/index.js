@@ -16,6 +16,7 @@ app.use('/api/auth', require('./src/routes/auth'))
 app.use('/api/restaurants', require('./src/routes/restaurants'))
 app.use('/api/reviews', require('./src/routes/reviews'))
 app.use('/api/wishlist', require('./src/routes/wishlist'))
+app.use('/api/friends', require('./src/routes/friends'))
 
 app.use(errorHandler)
 
