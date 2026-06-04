@@ -17,7 +17,7 @@ function Pastille({ to, label }) {
   )
 }
 
-export default function Navbar({ onFriendsToggle, friendsOpen, friendsPendingCount = 0 }) {
+export default function Navbar() {
   const { user, logout } = useAuth()
 
   return (
@@ -56,19 +56,7 @@ export default function Navbar({ onFriendsToggle, friendsOpen, friendsPendingCou
           <div className="bg-white rounded-full shadow-lg border border-gray-100 flex items-center gap-1 p-1.5">
             <Pastille to="/" label="Restaurants" />
             <Pastille to="/outings" label="Outings" />
-            <button
-              onClick={onFriendsToggle}
-              className={`relative px-5 py-2 rounded-full text-sm font-medium transition-colors ${
-                friendsOpen ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              Friends
-              {friendsPendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                  {friendsPendingCount}
-                </span>
-              )}
-            </button>
+            <Pastille to="/friends" label="Friends" />
           </div>
         </div>
       )}
