@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 
-export default function FriendsList() {
+export default function FriendsList({ open, onPendingCount }) {
   const [friends, setFriends] = useState([])
   const [requests, setRequests] = useState([])
   const [email, setEmail] = useState('')
@@ -11,7 +11,10 @@ export default function FriendsList() {
 
   useEffect(() => {
     api.get('/friends').then(res => setFriends(res.data)).catch(() => {})
-    api.get('/friends/requests').then(res => setRequests(res.data)).catch(() => {})
+    api.get('/friends/requests').then(res => {
+      setRequests(res.data)
+      onPendingCount?.(res.data.length)
+    }).catch(() => {})
   }, [])
 
   const handleAdd = async (e) => {
@@ -34,7 +37,9 @@ export default function FriendsList() {
   const handleAccept = async (friendship) => {
     try {
       const { data } = await api.patch(`/friends/${friendship.id}/accept`)
-      setRequests(prev => prev.filter(r => r.id !== friendship.id))
+      const next = requests.filter(r => r.id !== friendship.id)
+      setRequests(next)
+      onPendingCount?.(next.length)
       setFriends(prev => [...prev, data.requester])
     } catch {}
   }
@@ -42,7 +47,9 @@ export default function FriendsList() {
   const handleDecline = async (id) => {
     try {
       await api.delete(`/friends/${id}`)
-      setRequests(prev => prev.filter(r => r.id !== id))
+      const next = requests.filter(r => r.id !== id)
+      setRequests(next)
+      onPendingCount?.(next.length)
     } catch {}
   }
 
@@ -54,81 +61,82 @@ export default function FriendsList() {
   }
 
   return (
-    <aside className="w-64 shrink-0">
-      <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-6">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">Friends</h2>
+    <aside className="w-full lg:w-64 lg:shrink-0">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 lg:sticky lg:top-6">
+        <p className="text-sm font-semibold text-gray-900 mb-3">Friends</p>
 
-        {/* Add friend */}
-        <form onSubmit={handleAdd} className="mb-4">
-          <div className="flex gap-1">
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Add by email"
-              className="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
-              required
-            />
-            <button
-              type="submit"
-              disabled={sending}
-              className="bg-gray-900 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
-            >
-              Add
-            </button>
-          </div>
-          {addError && <p className="text-red-500 text-xs mt-1">{addError}</p>}
-          {addSuccess && <p className="text-green-600 text-xs mt-1">{addSuccess}</p>}
-        </form>
-
-        {/* Pending requests */}
-        {requests.length > 0 && (
-          <div className="mb-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-              Requests ({requests.length})
-            </p>
-            <ul className="space-y-2">
-              {requests.map(r => (
-                <li key={r.id} className="flex items-center gap-2">
-                  <Avatar name={r.requester.name} />
-                  <span className="text-sm text-gray-700 flex-1 truncate">{r.requester.name}</span>
-                  <button
-                    onClick={() => handleAccept(r)}
-                    className="text-xs text-green-600 hover:text-green-800 font-medium"
-                  >
-                    ✓
-                  </button>
-                  <button
-                    onClick={() => handleDecline(r.id)}
-                    className="text-xs text-red-400 hover:text-red-600"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Friends list */}
-        {friends.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-4">No friends yet</p>
-        ) : (
-          <ul className="space-y-2">
-            {friends.map(f => (
-              <li key={f.id} className="flex items-center gap-2 group">
-                <Avatar name={f.name} />
-                <span className="text-sm text-gray-700 flex-1 truncate">{f.name}</span>
+        {open && (
+          <div>
+            <form onSubmit={handleAdd} className="mb-4">
+              <div className="flex gap-1">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="Add by email"
+                  className="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  required
+                />
                 <button
-                  onClick={() => handleRemove(f)}
-                  className="text-xs text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove friend"
+                  type="submit"
+                  disabled={sending}
+                  className="bg-gray-900 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
                 >
-                  ✕
+                  Add
                 </button>
-              </li>
-            ))}
-          </ul>
+              </div>
+              {addError && <p className="text-red-500 text-xs mt-1">{addError}</p>}
+              {addSuccess && <p className="text-green-600 text-xs mt-1">{addSuccess}</p>}
+            </form>
+
+            {requests.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Requests ({requests.length})
+                </p>
+                <ul className="space-y-2">
+                  {requests.map(r => (
+                    <li key={r.id} className="flex items-center gap-2">
+                      <Avatar name={r.requester.name} />
+                      <span className="text-sm text-gray-700 flex-1 truncate">{r.requester.name}</span>
+                      <button
+                        onClick={() => handleAccept(r)}
+                        className="text-xs text-green-600 hover:text-green-800 font-medium"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => handleDecline(r.id)}
+                        className="text-xs text-red-400 hover:text-red-600"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {friends.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No friends yet</p>
+            ) : (
+              <ul className="space-y-2">
+                {friends.map(f => (
+                  <li key={f.id} className="flex items-center gap-2 group">
+                    <Avatar name={f.name} />
+                    <span className="text-sm text-gray-700 flex-1 truncate">{f.name}</span>
+                    <button
+                      onClick={() => handleRemove(f)}
+                      className="text-xs text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove friend"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
     </aside>
