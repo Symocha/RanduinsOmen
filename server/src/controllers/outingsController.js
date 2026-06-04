@@ -89,6 +89,7 @@ const update = async (req, res, next) => {
       },
       include: OUTING_DETAIL_INCLUDE,
     })
+    req.app.get('io').to(`outing:${req.params.id}`).emit('outing:updated', updated)
     res.json(updated)
   } catch (err) {
     next(err)
@@ -113,6 +114,7 @@ const invite = async (req, res, next) => {
       data: { outingId: req.params.id, userId },
       include: { user: { select: { id: true, name: true, avatar: true } } },
     })
+    req.app.get('io').to(`outing:${req.params.id}`).emit('member:added', member)
     res.status(201).json(member)
   } catch (err) {
     next(err)
@@ -134,6 +136,7 @@ const rsvp = async (req, res, next) => {
       where: { id: member.id },
       data: { rsvp: status },
     })
+    req.app.get('io').to(`outing:${req.params.id}`).emit('rsvp:update', { userId: req.user.id, rsvp: status })
     res.json(updated)
   } catch (err) {
     next(err)
@@ -150,14 +153,17 @@ const vote = async (req, res, next) => {
       where: { outingId, userId: req.user.id, restaurantId },
     })
 
+    const io = req.app.get('io')
     if (existing) {
       await prisma.outingVote.delete({ where: { id: existing.id } })
+      io.to(`outing:${outingId}`).emit('vote:toggle', { userId: req.user.id, restaurantId, added: false })
       return res.status(204).send()
     }
 
     const created = await prisma.outingVote.create({
       data: { outingId, userId: req.user.id, restaurantId },
     })
+    io.to(`outing:${outingId}`).emit('vote:toggle', { userId: req.user.id, restaurantId, added: true })
     res.status(201).json(created)
   } catch (err) {
     next(err)
