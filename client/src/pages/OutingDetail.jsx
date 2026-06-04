@@ -70,7 +70,10 @@ export default function OutingDetail() {
 
   const handleInvite = async (userId) => {
     const { data } = await api.post(`/outings/${id}/invite`, { userId })
-    setOuting(prev => ({ ...prev, members: [...prev.members, data] }))
+    setOuting(prev => {
+      if (prev.members.some(m => m.id === data.id)) return prev
+      return { ...prev, members: [...prev.members, data] }
+    })
   }
 
   const handleStatusChange = async (status) => {
@@ -101,7 +104,10 @@ export default function OutingDetail() {
       }))
     },
     onMemberAdded: (member) => {
-      setOuting(prev => ({ ...prev, members: [...prev.members, member] }))
+      setOuting(prev => {
+        if (prev.members.some(m => m.id === member.id)) return prev
+        return { ...prev, members: [...prev.members, member] }
+      })
     },
     onOutingUpdated: (updated) => {
       setOuting(updated)
