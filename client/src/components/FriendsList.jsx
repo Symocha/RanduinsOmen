@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
 
-export default function FriendsList() {
-  const [open, setOpen] = useState(() => window.innerWidth >= 1024)
+export default function FriendsList({ open, onPendingCount }) {
   const [friends, setFriends] = useState([])
   const [requests, setRequests] = useState([])
   const [email, setEmail] = useState('')
@@ -12,7 +11,10 @@ export default function FriendsList() {
 
   useEffect(() => {
     api.get('/friends').then(res => setFriends(res.data)).catch(() => {})
-    api.get('/friends/requests').then(res => setRequests(res.data)).catch(() => {})
+    api.get('/friends/requests').then(res => {
+      setRequests(res.data)
+      onPendingCount?.(res.data.length)
+    }).catch(() => {})
   }, [])
 
   const handleAdd = async (e) => {
@@ -35,7 +37,9 @@ export default function FriendsList() {
   const handleAccept = async (friendship) => {
     try {
       const { data } = await api.patch(`/friends/${friendship.id}/accept`)
-      setRequests(prev => prev.filter(r => r.id !== friendship.id))
+      const next = requests.filter(r => r.id !== friendship.id)
+      setRequests(next)
+      onPendingCount?.(next.length)
       setFriends(prev => [...prev, data.requester])
     } catch {}
   }
@@ -43,7 +47,9 @@ export default function FriendsList() {
   const handleDecline = async (id) => {
     try {
       await api.delete(`/friends/${id}`)
-      setRequests(prev => prev.filter(r => r.id !== id))
+      const next = requests.filter(r => r.id !== id)
+      setRequests(next)
+      onPendingCount?.(next.length)
     } catch {}
   }
 
@@ -54,28 +60,13 @@ export default function FriendsList() {
     } catch {}
   }
 
-  const pendingCount = requests.length
-
   return (
     <aside className="w-full lg:w-64 lg:shrink-0">
       <div className="bg-white rounded-lg border border-gray-200 p-4 lg:sticky lg:top-6">
-        <button
-          onClick={() => setOpen(o => !o)}
-          className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 mb-0"
-        >
-          <span>
-            Friends
-            {pendingCount > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
-                {pendingCount}
-              </span>
-            )}
-          </span>
-          <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
-        </button>
+        <p className="text-sm font-semibold text-gray-900 mb-3">Friends</p>
 
         {open && (
-          <div className="mt-3">
+          <div>
             <form onSubmit={handleAdd} className="mb-4">
               <div className="flex gap-1">
                 <input
