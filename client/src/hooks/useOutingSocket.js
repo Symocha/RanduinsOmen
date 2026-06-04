@@ -16,6 +16,8 @@ export function useOutingSocket(outingId, handlers) {
     socket.on('rsvp:update', (data) => handlersRef.current.onRsvpUpdate?.(data))
     socket.on('member:added', (data) => handlersRef.current.onMemberAdded?.(data))
     socket.on('outing:updated', (data) => handlersRef.current.onOutingUpdated?.(data))
+    socket.on('proposal:added', (data) => handlersRef.current.onProposalAdded?.(data))
+    socket.on('proposal:removed', (data) => handlersRef.current.onProposalRemoved?.(data))
 
     return () => {
       socket.emit('leave-outing', outingId)

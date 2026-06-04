@@ -5,6 +5,7 @@ const list = async (req, res, next) => {
     const { search, cuisine, priceRange } = req.query
     const restaurants = await prisma.restaurant.findMany({
       where: {
+        createdBy: req.user.id,
         ...(search && { name: { contains: search, mode: 'insensitive' } }),
         ...(cuisine && { cuisineType: cuisine }),
         ...(priceRange && { priceRange: parseInt(priceRange) }),
@@ -44,7 +45,7 @@ const create = async (req, res, next) => {
       return res.status(400).json({ error: 'name, address, cuisineType, priceRange are required' })
     }
     const restaurant = await prisma.restaurant.create({
-      data: { name, address, cuisineType, priceRange: parseInt(priceRange), googlePlaceId },
+      data: { name, address, cuisineType, priceRange: parseInt(priceRange), googlePlaceId, createdBy: req.user.id },
     })
     res.status(201).json(restaurant)
   } catch (err) {

@@ -24,9 +24,10 @@ export default function OutingDetail() {
   const { user } = useAuth()
   const [outing, setOuting] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [restaurants, setRestaurants] = useState([])
+  const [myRestaurants, setMyRestaurants] = useState([])
   const [friends, setFriends] = useState([])
   const [error, setError] = useState('')
+  const [proposing, setProposing] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -36,7 +37,7 @@ export default function OutingDetail() {
     ])
       .then(([o, r, f]) => {
         setOuting(o.data)
-        setRestaurants(r.data)
+        setMyRestaurants(r.data)
         setFriends(f.data)
       })
       .catch(() => setError('Could not load outing'))
@@ -45,6 +46,7 @@ export default function OutingDetail() {
 
   const isCreator = outing?.creatorId === user?.id
   const myMembership = outing?.members.find(m => m.userId === user?.id)
+  const isParty = isCreator || !!myMembership
 
   const handleRsvp = async (status) => {
     const { data } = await api.patch(`/outings/${id}/rsvp`, { status })
@@ -54,17 +56,42 @@ export default function OutingDetail() {
     }))
   }
 
-  const handleVote = async (restaurantId) => {
-    const hasVote = outing.votes.some(v => v.userId === user.id && v.restaurantId === restaurantId)
+  const handlePropose = async (restaurantId) => {
+    try {
+      const { data } = await api.post(`/outings/${id}/proposals`, { restaurantId })
+      setOuting(prev => {
+        if (prev.proposals.some(p => p.id === data.id)) return prev
+        return { ...prev, proposals: [...prev.proposals, data] }
+      })
+      setProposing(false)
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not propose restaurant')
+    }
+  }
+
+  const handleRemoveProposal = async (proposalId) => {
+    await api.delete(`/outings/${id}/proposals/${proposalId}`)
+    setOuting(prev => ({ ...prev, proposals: prev.proposals.filter(p => p.id !== proposalId) }))
+  }
+
+  const handleVote = async (proposalId) => {
+    const hasVote = outing.proposals.find(p => p.id === proposalId)?.votes.some(v => v.userId === user.id)
     if (hasVote) {
-      await api.post(`/outings/${id}/vote`, { restaurantId })
+      await api.post(`/outings/${id}/vote`, { proposalId })
       setOuting(prev => ({
         ...prev,
-        votes: prev.votes.filter(v => !(v.userId === user.id && v.restaurantId === restaurantId)),
+        proposals: prev.proposals.map(p =>
+          p.id === proposalId ? { ...p, votes: p.votes.filter(v => v.userId !== user.id) } : p
+        ),
       }))
     } else {
-      const { data } = await api.post(`/outings/${id}/vote`, { restaurantId })
-      setOuting(prev => ({ ...prev, votes: [...prev.votes, data] }))
+      const { data } = await api.post(`/outings/${id}/vote`, { proposalId })
+      setOuting(prev => ({
+        ...prev,
+        proposals: prev.proposals.map(p =>
+          p.id === proposalId ? { ...p, votes: [...p.votes, data] } : p
+        ),
+      }))
     }
   }
 
@@ -87,13 +114,20 @@ export default function OutingDetail() {
   }
 
   useOutingSocket(id, {
-    onVoteToggle: ({ userId, restaurantId, added }) => {
-      if (userId === user?.id) return
+    onVoteToggle: ({ userId: uid, proposalId, added }) => {
+      if (uid === user?.id) return
       setOuting(prev => ({
         ...prev,
-        votes: added
-          ? [...prev.votes, { userId, restaurantId }]
-          : prev.votes.filter(v => !(v.userId === userId && v.restaurantId === restaurantId)),
+        proposals: prev.proposals.map(p =>
+          p.id === proposalId
+            ? {
+                ...p,
+                votes: added
+                  ? [...p.votes, { userId: uid, proposalId }]
+                  : p.votes.filter(v => v.userId !== uid),
+              }
+            : p
+        ),
       }))
     },
     onRsvpUpdate: ({ userId: uid, rsvp }) => {
@@ -112,6 +146,15 @@ export default function OutingDetail() {
     onOutingUpdated: (updated) => {
       setOuting(updated)
     },
+    onProposalAdded: (proposal) => {
+      setOuting(prev => {
+        if (prev.proposals.some(p => p.id === proposal.id)) return prev
+        return { ...prev, proposals: [...prev.proposals, proposal] }
+      })
+    },
+    onProposalRemoved: ({ proposalId }) => {
+      setOuting(prev => ({ ...prev, proposals: prev.proposals.filter(p => p.id !== proposalId) }))
+    },
   })
 
   if (loading) return <p className="text-gray-400 text-sm">Loading...</p>
@@ -119,10 +162,8 @@ export default function OutingDetail() {
 
   const memberUserIds = new Set(outing.members.map(m => m.userId))
   const invitableFriends = friends.filter(f => f.id !== outing.creatorId && !memberUserIds.has(f.id))
-  const votesByRestaurant = outing.votes.reduce((acc, v) => {
-    acc[v.restaurantId] = (acc[v.restaurantId] || 0) + 1
-    return acc
-  }, {})
+  const proposedRestaurantIds = new Set(outing.proposals.map(p => p.restaurantId))
+  const proposableRestaurants = myRestaurants.filter(r => !proposedRestaurantIds.has(r.id))
 
   return (
     <div className="space-y-6">
@@ -199,12 +240,24 @@ export default function OutingDetail() {
           )}
         </section>
 
-        {/* Restaurant & Voting */}
+        {/* Proposals */}
         <section className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Restaurant</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-900">
+              {outing.restaurant ? 'Chosen restaurant' : 'Proposals'}
+            </h2>
+            {isParty && !proposing && proposableRestaurants.length > 0 && (
+              <button
+                onClick={() => setProposing(true)}
+                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors"
+              >
+                + Propose
+              </button>
+            )}
+          </div>
 
-          {outing.restaurant ? (
-            <div className="mb-4">
+          {outing.restaurant && (
+            <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-100">
               <p className="font-medium text-gray-900">{outing.restaurant.name}</p>
               <p className="text-sm text-gray-500 mt-0.5">{outing.restaurant.address}</p>
               {isCreator && (
@@ -216,46 +269,83 @@ export default function OutingDetail() {
                 </button>
               )}
             </div>
-          ) : (
-            <p className="text-sm text-gray-400 mb-3">No restaurant selected yet — vote below</p>
           )}
 
-          {restaurants.length > 0 && (
-            <>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                {outing.restaurant ? 'Change restaurant' : 'Vote'}
-              </p>
-              <ul className="space-y-1.5">
-                {restaurants.map(r => {
-                  const votes = votesByRestaurant[r.id] || 0
-                  const myVote = outing.votes.some(v => v.userId === user.id && v.restaurantId === r.id)
-                  return (
-                    <li key={r.id} className="flex items-center gap-2">
+          {proposing && (
+            <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs font-medium text-gray-600 mb-2">Pick from your list</p>
+              {proposableRestaurants.length === 0 ? (
+                <p className="text-xs text-gray-400">No restaurants to propose — add some on the Restaurants page.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {proposableRestaurants.map(r => (
+                    <li key={r.id}>
                       <button
-                        onClick={() => handleVote(r.id)}
-                        className={`text-xs px-2 py-1 rounded transition-colors ${
-                          myVote
-                            ? 'bg-gray-900 text-white'
-                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                        }`}
+                        onClick={() => handlePropose(r.id)}
+                        className="w-full text-left text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-2 py-1.5 rounded transition-colors flex items-center justify-between"
                       >
-                        {votes > 0 ? `${votes} ` : ''}{myVote ? '▲' : '△'}
+                        <span>{r.name}</span>
+                        <span className="text-xs text-gray-400">{'$'.repeat(r.priceRange)}</span>
                       </button>
-                      <span className="text-sm text-gray-700 flex-1">{r.name}</span>
-                      {isCreator && (
-                        <button
-                          onClick={() => handleSetRestaurant(r.id)}
-                          className="text-xs text-gray-400 hover:text-gray-700"
-                          title="Set as restaurant"
-                        >
-                          ✓ Pick
-                        </button>
-                      )}
                     </li>
-                  )
-                })}
-              </ul>
-            </>
+                  ))}
+                </ul>
+              )}
+              <button
+                onClick={() => setProposing(false)}
+                className="text-xs text-gray-400 hover:text-gray-600 mt-2"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {outing.proposals.length === 0 && !proposing ? (
+            <p className="text-sm text-gray-400 py-4 text-center">
+              No proposals yet — be the first to propose a restaurant
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {outing.proposals.map(p => {
+                const myVote = p.votes.some(v => v.userId === user.id)
+                const voteCount = p.votes.length
+                const canRemove = p.proposedBy === user.id || isCreator
+                return (
+                  <li key={p.id} className="flex items-center gap-2 group">
+                    <button
+                      onClick={() => handleVote(p.id)}
+                      className={`text-xs px-2 py-1 rounded transition-colors shrink-0 ${
+                        myVote ? 'bg-gray-900 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {voteCount > 0 ? `${voteCount} ` : ''}{myVote ? '▲' : '△'}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-gray-800">{p.restaurant.name}</span>
+                      <span className="text-xs text-gray-400 ml-1.5">by {p.proposer.name}</span>
+                    </div>
+                    {isCreator && (
+                      <button
+                        onClick={() => handleSetRestaurant(p.restaurantId)}
+                        className="text-xs text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        title="Pick this restaurant"
+                      >
+                        ✓ Pick
+                      </button>
+                    )}
+                    {canRemove && (
+                      <button
+                        onClick={() => handleRemoveProposal(p.id)}
+                        className="text-xs text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        title="Remove proposal"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
           )}
         </section>
       </div>

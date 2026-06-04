@@ -8,30 +8,36 @@ datasource db {
 }
 
 model User {
-  id               String         @id @default(uuid())
+  id               String           @id @default(uuid())
   name             String
-  email            String         @unique
+  email            String           @unique
   password         String
   avatar           String?
+  restaurants      Restaurant[]
   reviews          Review[]
   wishlist         Wishlist[]
-  sentRequests     Friendship[]   @relation("requester")
-  receivedRequests Friendship[]   @relation("addressee")
-  createdOutings   Outing[]       @relation("creator")
+  sentRequests     Friendship[]     @relation("requester")
+  receivedRequests Friendship[]     @relation("addressee")
+  createdOutings   Outing[]         @relation("creator")
   outingMembers    OutingMember[]
-  createdAt        DateTime       @default(now())
+  proposals        OutingProposal[]
+  votes            OutingVote[]
+  createdAt        DateTime         @default(now())
 }
 
 model Restaurant {
-  id            String     @id @default(uuid())
+  id            String           @id @default(uuid())
   name          String
   address       String
   cuisineType   String
   priceRange    Int
   googlePlaceId String?
+  createdBy     String
+  user          User             @relation(fields: [createdBy], references: [id])
   reviews       Review[]
   wishlist      Wishlist[]
   outings       Outing[]
+  proposals     OutingProposal[]
 }
 
 model Review {
@@ -70,17 +76,18 @@ model Wishlist {
 }
 
 model Outing {
-  id           String         @id @default(uuid())
+  id           String           @id @default(uuid())
   name         String
-  creator      User           @relation("creator", fields: [creatorId], references: [id])
+  creator      User             @relation("creator", fields: [creatorId], references: [id])
   creatorId    String
-  restaurant   Restaurant?    @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant?      @relation(fields: [restaurantId], references: [id])
   restaurantId String?
   date         DateTime?
-  status       String         @default("planning")
+  status       String           @default("planning")
   members      OutingMember[]
+  proposals    OutingProposal[]
   votes        OutingVote[]
-  createdAt    DateTime       @default(now())
+  createdAt    DateTime         @default(now())
 }
 
 model OutingMember {
@@ -92,10 +99,29 @@ model OutingMember {
   rsvp     String @default("pending")
 }
 
-model OutingVote {
-  id           String @id @default(uuid())
-  outing       Outing @relation(fields: [outingId], references: [id])
+model OutingProposal {
+  id           String       @id @default(uuid())
   outingId     String
   restaurantId String
-  userId       String
+  proposedBy   String
+  outing       Outing       @relation(fields: [outingId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id])
+  proposer     User         @relation(fields: [proposedBy], references: [id])
+  votes        OutingVote[]
+  createdAt    DateTime     @default(now())
+
+  @@unique([outingId, restaurantId])
+}
+
+model OutingVote {
+  id         String         @id @default(uuid())
+  outingId   String
+  proposalId String
+  userId     String
+  outing     Outing         @relation(fields: [outingId], references: [id], onDelete: Cascade)
+  proposal   OutingProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id])
+  createdAt  DateTime       @default(now())
+
+  @@unique([proposalId, userId])
 }

@@ -4,7 +4,14 @@ const OUTING_DETAIL_INCLUDE = {
   creator: { select: { id: true, name: true, avatar: true } },
   restaurant: true,
   members: { include: { user: { select: { id: true, name: true, avatar: true } } } },
-  votes: true,
+  proposals: {
+    include: {
+      restaurant: true,
+      proposer: { select: { id: true, name: true } },
+      votes: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  },
 }
 
 const list = async (req, res, next) => {
@@ -143,31 +150,88 @@ const rsvp = async (req, res, next) => {
   }
 }
 
-const vote = async (req, res, next) => {
+const propose = async (req, res, next) => {
   try {
     const { restaurantId } = req.body
     if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' })
 
     const outingId = req.params.id
+    const outing = await prisma.outing.findUnique({
+      where: { id: outingId },
+      include: { members: true },
+    })
+    if (!outing) return res.status(404).json({ error: 'Outing not found' })
+
+    const isParty =
+      outing.creatorId === req.user.id ||
+      outing.members.some(m => m.userId === req.user.id)
+    if (!isParty) return res.status(403).json({ error: 'Forbidden' })
+
+    const restaurant = await prisma.restaurant.findFirst({
+      where: { id: restaurantId, createdBy: req.user.id },
+    })
+    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found in your list' })
+
+    const proposal = await prisma.outingProposal.create({
+      data: { outingId, restaurantId, proposedBy: req.user.id },
+      include: {
+        restaurant: true,
+        proposer: { select: { id: true, name: true } },
+        votes: true,
+      },
+    })
+    req.app.get('io').to(`outing:${outingId}`).emit('proposal:added', proposal)
+    res.status(201).json(proposal)
+  } catch (err) {
+    if (err.code === 'P2002') return res.status(409).json({ error: 'Already proposed' })
+    next(err)
+  }
+}
+
+const removeProposal = async (req, res, next) => {
+  try {
+    const { id: outingId, proposalId } = req.params
+
+    const proposal = await prisma.outingProposal.findUnique({ where: { id: proposalId } })
+    if (!proposal) return res.status(404).json({ error: 'Proposal not found' })
+
+    const outing = await prisma.outing.findUnique({ where: { id: outingId } })
+    const canRemove = proposal.proposedBy === req.user.id || outing.creatorId === req.user.id
+    if (!canRemove) return res.status(403).json({ error: 'Forbidden' })
+
+    await prisma.outingProposal.delete({ where: { id: proposalId } })
+    req.app.get('io').to(`outing:${outingId}`).emit('proposal:removed', { proposalId })
+    res.status(204).send()
+  } catch (err) {
+    next(err)
+  }
+}
+
+const vote = async (req, res, next) => {
+  try {
+    const { proposalId } = req.body
+    if (!proposalId) return res.status(400).json({ error: 'proposalId is required' })
+
+    const outingId = req.params.id
     const existing = await prisma.outingVote.findFirst({
-      where: { outingId, userId: req.user.id, restaurantId },
+      where: { outingId, userId: req.user.id, proposalId },
     })
 
     const io = req.app.get('io')
     if (existing) {
       await prisma.outingVote.delete({ where: { id: existing.id } })
-      io.to(`outing:${outingId}`).emit('vote:toggle', { userId: req.user.id, restaurantId, added: false })
+      io.to(`outing:${outingId}`).emit('vote:toggle', { userId: req.user.id, proposalId, added: false })
       return res.status(204).send()
     }
 
     const created = await prisma.outingVote.create({
-      data: { outingId, userId: req.user.id, restaurantId },
+      data: { outingId, userId: req.user.id, proposalId },
     })
-    io.to(`outing:${outingId}`).emit('vote:toggle', { userId: req.user.id, restaurantId, added: true })
+    io.to(`outing:${outingId}`).emit('vote:toggle', { userId: req.user.id, proposalId, added: true })
     res.status(201).json(created)
   } catch (err) {
     next(err)
   }
 }
 
-module.exports = { list, get, create, update, invite, rsvp, vote }
+module.exports = { list, get, create, update, invite, rsvp, propose, removeProposal, vote }
