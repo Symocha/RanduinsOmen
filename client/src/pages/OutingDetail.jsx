@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
+import { useOutingSocket } from '../hooks/useOutingSocket'
 
 const STATUS_STYLES = {
   planning:  'bg-yellow-100 text-yellow-700',
@@ -69,7 +70,10 @@ export default function OutingDetail() {
 
   const handleInvite = async (userId) => {
     const { data } = await api.post(`/outings/${id}/invite`, { userId })
-    setOuting(prev => ({ ...prev, members: [...prev.members, data] }))
+    setOuting(prev => {
+      if (prev.members.some(m => m.id === data.id)) return prev
+      return { ...prev, members: [...prev.members, data] }
+    })
   }
 
   const handleStatusChange = async (status) => {
@@ -81,6 +85,34 @@ export default function OutingDetail() {
     const { data } = await api.patch(`/outings/${id}`, { restaurantId })
     setOuting(data)
   }
+
+  useOutingSocket(id, {
+    onVoteToggle: ({ userId, restaurantId, added }) => {
+      if (userId === user?.id) return
+      setOuting(prev => ({
+        ...prev,
+        votes: added
+          ? [...prev.votes, { userId, restaurantId }]
+          : prev.votes.filter(v => !(v.userId === userId && v.restaurantId === restaurantId)),
+      }))
+    },
+    onRsvpUpdate: ({ userId: uid, rsvp }) => {
+      if (uid === user?.id) return
+      setOuting(prev => ({
+        ...prev,
+        members: prev.members.map(m => m.userId === uid ? { ...m, rsvp } : m),
+      }))
+    },
+    onMemberAdded: (member) => {
+      setOuting(prev => {
+        if (prev.members.some(m => m.id === member.id)) return prev
+        return { ...prev, members: [...prev.members, member] }
+      })
+    },
+    onOutingUpdated: (updated) => {
+      setOuting(updated)
+    },
+  })
 
   if (loading) return <p className="text-gray-400 text-sm">Loading...</p>
   if (error || !outing) return <p className="text-red-500 text-sm">{error || 'Outing not found'}</p>
