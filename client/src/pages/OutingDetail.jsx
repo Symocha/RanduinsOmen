@@ -28,6 +28,7 @@ export default function OutingDetail() {
   const [friends, setFriends] = useState([])
   const [error, setError] = useState('')
   const [proposing, setProposing] = useState(false)
+  const [proposeSearch, setProposeSearch] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -64,6 +65,7 @@ export default function OutingDetail() {
         return { ...prev, proposals: [...prev.proposals, data] }
       })
       setProposing(false)
+      setProposeSearch('')
     } catch (err) {
       alert(err.response?.data?.error || 'Could not propose restaurant')
     }
@@ -271,35 +273,6 @@ export default function OutingDetail() {
             </div>
           )}
 
-          {proposing && (
-            <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs font-medium text-gray-600 mb-2">Pick from your list</p>
-              {proposableRestaurants.length === 0 ? (
-                <p className="text-xs text-gray-400">No restaurants to propose — add some on the Restaurants page.</p>
-              ) : (
-                <ul className="space-y-1">
-                  {proposableRestaurants.map(r => (
-                    <li key={r.id}>
-                      <button
-                        onClick={() => handlePropose(r.id)}
-                        className="w-full text-left text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-2 py-1.5 rounded transition-colors flex items-center justify-between"
-                      >
-                        <span>{r.name}</span>
-                        <span className="text-xs text-gray-400">{'$'.repeat(r.priceRange)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <button
-                onClick={() => setProposing(false)}
-                className="text-xs text-gray-400 hover:text-gray-600 mt-2"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
           {outing.proposals.length === 0 && !proposing ? (
             <p className="text-sm text-gray-400 py-4 text-center">
               No proposals yet — be the first to propose a restaurant
@@ -349,6 +322,61 @@ export default function OutingDetail() {
           )}
         </section>
       </div>
+
+      {/* Propose modal */}
+      {proposing && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          onClick={e => { if (e.target === e.currentTarget) { setProposing(false); setProposeSearch('') } }}
+        >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Propose a restaurant</h3>
+              <input
+                autoFocus
+                type="text"
+                value={proposeSearch}
+                onChange={e => setProposeSearch(e.target.value)}
+                placeholder="Search your restaurants…"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+            </div>
+            <ul className="overflow-y-auto max-h-64">
+              {proposableRestaurants
+                .filter(r => r.name.toLowerCase().includes(proposeSearch.toLowerCase()))
+                .map(r => (
+                  <li key={r.id}>
+                    <button
+                      onClick={() => handlePropose(r.id)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-medium">{r.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">{r.cuisineType}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 shrink-0">{'$'.repeat(r.priceRange)}</span>
+                    </button>
+                  </li>
+                ))}
+              {proposableRestaurants.filter(r => r.name.toLowerCase().includes(proposeSearch.toLowerCase())).length === 0 && (
+                <li className="px-4 py-6 text-sm text-gray-400 text-center">
+                  {proposableRestaurants.length === 0
+                    ? 'No restaurants to propose — add some on the Restaurants page.'
+                    : 'No results'}
+                </li>
+              )}
+            </ul>
+            <div className="p-3 border-t border-gray-100">
+              <button
+                onClick={() => { setProposing(false); setProposeSearch('') }}
+                className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Creator actions */}
       {isCreator && (
