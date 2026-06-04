@@ -25,11 +25,11 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="bg-white border-b border-gray-200">
+      <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
           <Link to="/" className="font-semibold text-gray-900 inline-flex items-center gap-2" aria-label="RestaurantApp home">
             <i className="fa-solid fa-utensils text-gray-900" aria-hidden="true" />
-            <span className="sr-only">RestaurantApp</span>
+            <span>RestaurantApp</span>
           </Link>
           <div className="flex items-center gap-3">
             {user ? (

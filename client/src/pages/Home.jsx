@@ -41,15 +41,17 @@ export default function Home() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Restaurants</h1>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="bg-gray-900 text-white px-4 py-2 rounded text-sm font-medium hover:bg-gray-700 transition-colors"
-        >
-          + Add restaurant
-        </button>
       </div>
+
+      <button
+        onClick={() => setShowAdd(true)}
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gray-900 text-white shadow-lg shadow-black/20 transition-transform hover:-translate-y-1 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+        aria-label="Add restaurant"
+      >
+        <i className="fa-solid fa-plus text-lg" aria-hidden="true" />
+      </button>
 
       {loading ? (
         <p className="text-gray-400 text-sm">Loading...</p>
