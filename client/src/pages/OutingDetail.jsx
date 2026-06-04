@@ -248,14 +248,29 @@ export default function OutingDetail() {
             <h2 className="text-sm font-semibold text-gray-900">
               {outing.restaurant ? 'Chosen restaurant' : 'Proposals'}
             </h2>
-            {isParty && !proposing && proposableRestaurants.length > 0 && (
-              <button
-                onClick={() => setProposing(true)}
-                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors"
-              >
-                + Propose
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {isCreator && outing.proposals.length > 0 && !outing.restaurant && (
+                <button
+                  onClick={() => {
+                    const pick = outing.proposals[Math.floor(Math.random() * outing.proposals.length)]
+                    handleSetRestaurant(pick.restaurantId)
+                  }}
+                  className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors"
+                  title="Pick a random proposal"
+                >
+                  <i className="fa-solid fa-dice mr-1" aria-hidden="true" />
+                  Random
+                </button>
+              )}
+              {isParty && !proposing && proposableRestaurants.length > 0 && (
+                <button
+                  onClick={() => setProposing(true)}
+                  className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors"
+                >
+                  + Propose
+                </button>
+              )}
+            </div>
           </div>
 
           {outing.restaurant && (
