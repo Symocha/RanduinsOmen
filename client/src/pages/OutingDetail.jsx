@@ -299,10 +299,10 @@ export default function OutingDetail() {
                 const voteCount = p.votes.length
                 const canRemove = p.proposedBy === user.id || isCreator
                 return (
-                  <li key={p.id} className="flex items-center gap-2 group">
+                  <li key={p.id} className="flex items-center gap-2">
                     <button
                       onClick={() => handleVote(p.id)}
-                      className={`text-xs px-2 py-1 rounded transition-colors shrink-0 ${
+                      className={`min-w-[2.75rem] h-10 px-3 rounded-lg text-sm font-medium transition-colors shrink-0 ${
                         myVote ? 'bg-gray-900 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                       }`}
                     >
@@ -315,16 +315,16 @@ export default function OutingDetail() {
                     {isCreator && (
                       <button
                         onClick={() => handleSetRestaurant(p.restaurantId)}
-                        className="text-xs text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        className="h-9 w-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
                         title="Pick this restaurant"
                       >
-                        ✓ Pick
+                        <i className="fa-solid fa-check" aria-hidden="true" />
                       </button>
                     )}
                     {canRemove && (
                       <button
                         onClick={() => handleRemoveProposal(p.id)}
-                        className="text-xs text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        className="h-9 w-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
                         title="Remove proposal"
                       >
                         ✕
